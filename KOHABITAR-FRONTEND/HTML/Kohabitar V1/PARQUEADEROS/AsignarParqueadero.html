@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asignación de Parqueaderos</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <style>
+    .parking-spot {
+      width: 100px;
+      height: 60px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .disponible { background-color: #198754; }
+    .ocupado { background-color: #dc3545; }
+    .inactivo { background-color: #6c757d; }
+    .tipo-carro::after { content: "Carro"; }
+    .tipo-moto::after { content: "Moto"; }
+    .tipo-visitante::after { content: "Visitante"; }
+    .tipo-residente::after { content: "Residente"; }
+    .tipo-propietario::after { content: "Propietario"; }
+  </style>
+</head>
+<body class="p-3 d-flex flex-column min-vh-100">
+
+  <div class="container flex-grow-1 py-4">
+    <h2 class="mb-4">Asignación de Parqueaderos</h2>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <label for="filtroTipo" class="form-label">Filtrar por tipo:</label>
+        <select id="filtroTipo" class="form-select w-auto d-inline-block">
+          <option value="todos">Todos</option>
+          <option value="carro">Carro</option>
+          <option value="moto">Moto</option>
+          <option value="visitante">Visitante</option>
+          <option value="residente">Residente</option>
+          <option value="propietario">Propietario</option>
+        </select>
+      </div>
+      <button class="btn btn-primary mb-3" onclick="abrirModalCrear()">+ Agregar Parqueadero</button>
+    </div>
+
+    <!-- Modal Parqueadero -->
+    <div class="modal fade" id="modalParqueadero" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Detalle del Parqueadero</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p><strong>ID:</strong> <span id="modalId"></span></p>
+            <p><strong>Vehículo:</strong> <span id="modalVehiculo"></span></p>
+            <p><strong>Estado:</strong> <span id="modalEstado"></span></p>
+            <p><strong>Ocupado por:</strong> <span id="modalOcupadoPor"></span></p>
+            <p id="horaLlegadaGroup"><strong>Hora de llegada:</strong> <span id="modalHoraLlegada"></span></p>
+            <p id="horaSalidaGroup"><strong>Hora de salida:</strong> <span id="modalHoraSalida"></span></p>
+            <p id="tarifaGroup"><strong>Tarifa:</strong> $<span id="modalTarifa"></span></p>
+
+            <div id="asignarForm" class="d-none">
+              <label class="form-label">Asignar a:</label>
+              <select id="tipoUsuario" class="form-select mb-2">
+                <option value="residente">Residente</option>
+                <option value="propietario">Propietario</option>
+                <option value="visitante">Visitante</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="btnAsignar" class="btn btn-success">Asignar</button>
+            <button id="btnLiberar" class="btn btn-warning">Liberar</button>
+            <button id="btnInactivar" class="btn btn-secondary">Activar/Inactivar</button>
+            <button class="btn btn-outline-dark" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Crear -->
+    <div class="modal fade" id="modalCrear" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header"><h5 class="modal-title">Nuevo Parqueadero</h5></div>
+          <div class="modal-body">
+            <label>Tipo de vehículo:</label>
+            <select id="nuevoVehiculo" class="form-select mb-3">
+              <option value="carro">Carro</option>
+              <option value="moto">Moto</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" onclick="crearParqueadero()">Crear</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="parkingContainer" class="row g-3 mt-4"></div>
+
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let parqueaderos = [
+      { id: 1, tipoVehiculo: 'carro', estado: 'disponible', ocupadoPor: null, llegada: null, salida: null, tarifa: 0 },
+      { id: 2, tipoVehiculo: 'moto', estado: 'ocupado', ocupadoPor: 'residente', llegada: null, salida: null, tarifa: 0 }
+    ];
+    let parqueaderoActual = null;
+  
+    function renderParqueaderos() {
+      const container = document.getElementById('parkingContainer');
+      container.innerHTML = '';
+      parqueaderos.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'col-auto';
+        const spot = document.createElement('div');
+        spot.className = `parking-spot ${p.estado} tipo-${p.tipoVehiculo}`;
+        spot.innerText = `${p.id}\n${p.ocupadoPor ? p.ocupadoPor : 'Libre'}`;
+        spot.onclick = () => abrirModal(p);
+        div.appendChild(spot);
+        container.appendChild(div);
+      });
+    }
+
+    function abrirModal(p) {
+      parqueaderoActual = p;
+      document.getElementById('modalId').innerText = p.id;
+      document.getElementById('modalVehiculo').innerText = p.tipoVehiculo;
+      document.getElementById('modalEstado').innerText = p.estado;
+      document.getElementById('modalOcupadoPor').innerText = p.ocupadoPor || 'Libre';
+      document.getElementById('modalHoraLlegada').innerText = p.llegada ? new Date(p.llegada).toLocaleString() : '-';
+      document.getElementById('modalHoraSalida').innerText = p.salida ? new Date(p.salida).toLocaleString() : '-';
+      document.getElementById('modalTarifa').innerText = p.tarifa.toFixed(2);
+
+      const mostrarVisitante = p.ocupadoPor === 'visitante';
+      document.getElementById('horaLlegadaGroup').style.display = mostrarVisitante ? 'block' : 'none';
+      document.getElementById('horaSalidaGroup').style.display = mostrarVisitante ? 'block' : 'none';
+      document.getElementById('tarifaGroup').style.display = mostrarVisitante ? 'block' : 'none';
+
+      document.getElementById('asignarForm').classList.toggle('d-none', p.estado !== 'disponible');
+      document.getElementById('btnAsignar').style.display = p.estado === 'disponible' ? 'inline-block' : 'none';
+      document.getElementById('btnLiberar').style.display = p.estado === 'ocupado' ? 'inline-block' : 'none';
+
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalParqueadero')).show();
+    }
+
+    function abrirModalCrear() {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCrear')).show();
+    }
+
+    function crearParqueadero() {
+      const tipoVehiculo = document.getElementById('nuevoVehiculo').value;
+      const nuevoId = parqueaderos.length ? Math.max(...parqueaderos.map(p => p.id)) + 1 : 1;
+      parqueaderos.push({ id: nuevoId, tipoVehiculo, estado: 'disponible', ocupadoPor: null, llegada: null, salida: null, tarifa: 0 });
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCrear')).hide();
+      renderParqueaderos();
+    }
+
+    document.getElementById('btnAsignar').onclick = () => {
+      const tipoUsuario = document.getElementById('tipoUsuario').value;
+      parqueaderoActual.estado = 'ocupado';
+      parqueaderoActual.ocupadoPor = tipoUsuario;
+
+      if (tipoUsuario === 'visitante') {
+        parqueaderoActual.llegada = new Date();
+        parqueaderoActual.salida = null;
+        parqueaderoActual.tarifa = 0;
+      } else {
+        parqueaderoActual.llegada = null;
+        parqueaderoActual.salida = null;
+        parqueaderoActual.tarifa = 0;
+      }
+
+      renderParqueaderos();
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalParqueadero')).hide();
+    };
+
+    document.getElementById('btnLiberar').onclick = () => {
+      if (parqueaderoActual.ocupadoPor === 'visitante' && parqueaderoActual.llegada) {
+        parqueaderoActual.salida = new Date();
+        parqueaderoActual.tarifa = calcularTarifa(parqueaderoActual.llegada, parqueaderoActual.salida);
+
+        document.getElementById('modalHoraSalida').innerText = new Date(parqueaderoActual.salida).toLocaleString();
+        document.getElementById('modalTarifa').innerText = parqueaderoActual.tarifa.toFixed(2);
+        document.getElementById('horaSalidaGroup').style.display = 'block';
+        document.getElementById('tarifaGroup').style.display = 'block';
+
+        setTimeout(() => {
+          parqueaderoActual.estado = 'disponible';
+          parqueaderoActual.ocupadoPor = null;
+          parqueaderoActual.llegada = null;
+          parqueaderoActual.salida = null;
+          parqueaderoActual.tarifa = 0;
+
+          renderParqueaderos();
+          bootstrap.Modal.getOrCreateInstance(document.getElementById('modalParqueadero')).hide();
+        }, 3000); // Muestra el resumen por 3 segundos
+      } else {
+        parqueaderoActual.estado = 'disponible';
+        parqueaderoActual.ocupadoPor = null;
+        parqueaderoActual.llegada = null;
+        parqueaderoActual.salida = null;
+        parqueaderoActual.tarifa = 0;
+
+        renderParqueaderos();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalParqueadero')).hide();
+      }
+    };
+
+    function calcularTarifa(llegada, salida) {
+      const minutos = Math.ceil((salida - llegada) / 60000);
+      const tarifaPorMinuto = 100;
+      return minutos * tarifaPorMinuto;
+    }
+
+    document.getElementById('btnInactivar').onclick = () => {
+      parqueaderoActual.estado = parqueaderoActual.estado === 'inactivo' ? 'disponible' : 'inactivo';
+      renderParqueaderos();
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalParqueadero')).hide();
+    };
+
+    renderParqueaderos();
+  </script>
+</body>
+</html>
